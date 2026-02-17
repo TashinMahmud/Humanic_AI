@@ -6,6 +6,7 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.chat import router as chat_router
 from app.api.routes.voice import router as voice_router
@@ -50,3 +51,7 @@ async def health_check():
         "model": settings.MODEL_NAME,
         "available_roles": list_roles(),
     }
+
+
+# ── Static files (must be last so API routes take priority) ──
+app.mount("/", StaticFiles(directory="app/static", html=True), name="static")
