@@ -87,8 +87,11 @@ class AIResponse(BaseModel):
 
 
 # ──────────────────────────────────────────────
-# Main chat completion
+# Session-based conversation history (in-memory)
 # ──────────────────────────────────────────────
+
+_session_histories: dict[str, list[dict[str, str]]] = {}
+MAX_HISTORY = 20  # Keep last N messages per session
 
 
 def generate_response(
@@ -101,8 +104,14 @@ def generate_response(
 
     Uses OpenAI Structured Outputs (beta.chat.completions.parse) so the
     model returns a validated AIResponse — no regex, no JSON scraping.
+    Maintains conversation history per session_id for multi-turn context.
     """
     session_id = session_id or str(uuid.uuid4())
+
+    # Get or create session history
+    if session_id not in _session_histories:
+        _session_histories[session_id] = []
+    history = _session_histories[session_id]
 
     # 1. Retrieve relevant memories
     memories = retrieve_memories(user_id, message, top_k=5)
@@ -116,27 +125,35 @@ def generate_response(
     # 2. Build system prompt
     system_prompt = get_personality(role) + memory_context
 
-    # 3. Call OpenAI with Structured Outputs
+    # 3. Build messages with conversation history
+    messages = [
+        {"role": "system", "content": system_prompt},
+        *history[-MAX_HISTORY:],
+        {"role": "user", "content": message},
+    ]
+
+    # 4. Call OpenAI with Structured Outputs
     client = _get_openai()
     completion = client.beta.chat.completions.parse(
         model=settings.MODEL_NAME,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message},
-        ],
+        messages=messages,
         response_format=AIResponse,
         temperature=0.85,
     )
 
     ai_response: AIResponse = completion.choices[0].message.parsed  # type: ignore[assignment]
 
-    # 4. Intelligent fact extraction & saving (via gpt-4o-mini)
+    # 5. Update conversation history
+    history.append({"role": "user", "content": message})
+    history.append({"role": "assistant", "content": ai_response.reply_text})
+
+    # 6. Intelligent fact extraction & saving (via gpt-4o-mini)
     facts = intelligent_extract(message)
     for fact in facts:
         save_memory(user_id, fact, metadata={"source": "user_message", "role": role})
         logger.info("Saved fact for %s: %s", user_id, fact[:60])
 
-    # 5. Build response
+    # 7. Build response
     return ChatResponse(
         text=ai_response.reply_text,
         emotion=ai_response.emotion.value,
@@ -144,3 +161,4 @@ def generate_response(
         audio_url=None,  # Placeholder for future ElevenLabs integration
         session_id=session_id,
     )
+

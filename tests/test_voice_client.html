@@ -1,13 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Humanic AI – Live Voice Test</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             background: #0a0a0f;
@@ -21,14 +26,14 @@
 
         .container {
             width: 100%;
-            max-width: 700px;
+            max-width: 720px;
         }
 
-        /* Header */
         .header {
             text-align: center;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
         }
+
         .header h1 {
             font-size: 1.8rem;
             font-weight: 700;
@@ -37,6 +42,7 @@
             -webkit-text-fill-color: transparent;
             margin-bottom: 0.3rem;
         }
+
         .header p {
             font-size: 0.85rem;
             color: #777;
@@ -45,45 +51,56 @@
         /* Connection bar */
         .connection-bar {
             display: flex;
-            gap: 0.75rem;
+            gap: 0.6rem;
             align-items: center;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
         }
+
         .connection-bar select,
         .connection-bar input {
-            flex: 1;
             background: #151520;
             border: 1px solid #2a2a3a;
             border-radius: 10px;
-            padding: 0.65rem 1rem;
+            padding: 0.6rem 0.8rem;
             color: #e0e0e8;
             font-family: 'Inter', sans-serif;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             outline: none;
             transition: border-color 0.2s;
         }
+
         .connection-bar input:focus,
         .connection-bar select:focus {
             border-color: #7c5cff;
         }
-        .connection-bar select { max-width: 140px; }
-        .connection-bar input { max-width: 180px; }
+
+        .connection-bar input {
+            flex: 1;
+            min-width: 120px;
+        }
 
         .btn {
-            padding: 0.65rem 1.4rem;
+            padding: 0.6rem 1.2rem;
             border: none;
             border-radius: 10px;
             font-family: 'Inter', sans-serif;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
         }
+
         .btn-connect {
             background: linear-gradient(135deg, #7c5cff, #6a4fff);
             color: #fff;
         }
-        .btn-connect:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(124, 92, 255, 0.4); }
+
+        .btn-connect:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(124, 92, 255, 0.4);
+        }
+
         .btn-connect.connected {
             background: linear-gradient(135deg, #ff4d6a, #e0345a);
         }
@@ -96,28 +113,97 @@
             flex-shrink: 0;
             transition: background 0.3s;
         }
-        .status-dot.connected { background: #00e676; box-shadow: 0 0 8px #00e676; }
-        .status-dot.error { background: #ff4d6a; box-shadow: 0 0 8px #ff4d6a; }
 
-        /* Chat area */
+        .status-dot.connected {
+            background: #00e676;
+            box-shadow: 0 0 8px #00e676;
+        }
+
+        .status-dot.error {
+            background: #ff4d6a;
+            box-shadow: 0 0 8px #ff4d6a;
+        }
+
+        /* Audio toggle row */
+        .audio-bar {
+            display: flex;
+            gap: 0.6rem;
+            align-items: center;
+            margin-bottom: 1.2rem;
+            flex-wrap: wrap;
+        }
+
+        .audio-bar label {
+            font-size: 0.8rem;
+            color: #999;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            cursor: pointer;
+        }
+
+        .audio-bar select {
+            background: #151520;
+            border: 1px solid #2a2a3a;
+            border-radius: 10px;
+            padding: 0.5rem 0.8rem;
+            color: #e0e0e8;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.82rem;
+            outline: none;
+        }
+
+        .audio-bar .vol-icon {
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .audio-bar .vol-icon.active {
+            color: #7c5cff;
+        }
+
+        .audio-bar .vol-icon.muted {
+            color: #555;
+        }
+
+        /* Chat log */
         .chat-log {
             background: #12121c;
             border: 1px solid #1e1e2e;
             border-radius: 14px;
-            height: 400px;
+            height: 380px;
             overflow-y: auto;
             padding: 1.2rem;
             margin-bottom: 1rem;
             scroll-behavior: smooth;
         }
-        .chat-log::-webkit-scrollbar { width: 6px; }
-        .chat-log::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
+
+        .chat-log::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-log::-webkit-scrollbar-thumb {
+            background: #2a2a3a;
+            border-radius: 3px;
+        }
 
         .log-entry {
             margin-bottom: 1rem;
             animation: fadeIn 0.2s ease;
         }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
 
         .log-entry.user .bubble {
             background: #1e1e35;
@@ -126,6 +212,7 @@
             border-radius: 0 10px 10px 0;
             margin-left: 0.5rem;
         }
+
         .log-entry.ai .bubble {
             background: #1a1a28;
             border-left: 3px solid #00e676;
@@ -133,6 +220,7 @@
             border-radius: 0 10px 10px 0;
             margin-left: 0.5rem;
         }
+
         .log-entry .label {
             font-size: 0.7rem;
             font-weight: 600;
@@ -141,10 +229,19 @@
             margin-bottom: 0.3rem;
             margin-left: 0.6rem;
         }
-        .log-entry.user .label { color: #7c5cff; }
-        .log-entry.ai .label { color: #00e676; }
 
-        .log-entry .bubble .text { line-height: 1.55; font-size: 0.9rem; }
+        .log-entry.user .label {
+            color: #7c5cff;
+        }
+
+        .log-entry.ai .label {
+            color: #00e676;
+        }
+
+        .log-entry .bubble .text {
+            line-height: 1.55;
+            font-size: 0.9rem;
+        }
 
         .control-badge {
             display: inline-flex;
@@ -157,7 +254,23 @@
             margin-right: 0.4rem;
             margin-top: 0.5rem;
         }
-        .control-badge .emoji { font-size: 0.85rem; }
+
+        .control-badge .emoji {
+            font-size: 0.85rem;
+        }
+
+        .audio-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: #1a2535;
+            border: 1px solid #2a4a6a;
+            border-radius: 6px;
+            padding: 0.25rem 0.6rem;
+            font-size: 0.72rem;
+            margin-top: 0.5rem;
+            color: #5ca5ff;
+        }
 
         .stream-cursor {
             display: inline-block;
@@ -168,9 +281,19 @@
             vertical-align: text-bottom;
             margin-left: 2px;
         }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
-        /* System messages */
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+
         .log-entry.system .bubble {
             background: transparent;
             border-left: 3px solid #555;
@@ -181,13 +304,17 @@
             color: #666;
             font-style: italic;
         }
-        .log-entry.system .label { color: #555; }
+
+        .log-entry.system .label {
+            color: #555;
+        }
 
         /* Input area */
         .input-area {
             display: flex;
             gap: 0.75rem;
         }
+
         .input-area input {
             flex: 1;
             background: #151520;
@@ -200,34 +327,55 @@
             outline: none;
             transition: border-color 0.2s;
         }
-        .input-area input:focus { border-color: #7c5cff; }
-        .input-area input:disabled { opacity: 0.4; }
+
+        .input-area input:focus {
+            border-color: #7c5cff;
+        }
+
+        .input-area input:disabled {
+            opacity: 0.4;
+        }
 
         .btn-send {
             background: linear-gradient(135deg, #00e676, #00c853);
             color: #0a0a0f;
             min-width: 80px;
         }
-        .btn-send:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0, 230, 118, 0.3); }
-        .btn-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
-        /* Latency counter */
+        .btn-send:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(0, 230, 118, 0.3);
+        }
+
+        .btn-send:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
         .metrics {
             display: flex;
             justify-content: center;
-            gap: 2rem;
+            gap: 1.5rem;
             margin-top: 1rem;
             font-size: 0.75rem;
             color: #555;
+            flex-wrap: wrap;
         }
-        .metrics span { font-weight: 600; color: #7c5cff; }
+
+        .metrics span {
+            font-weight: 600;
+            color: #7c5cff;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
             <h1>🎙️ Humanic AI — Live Voice Test</h1>
-            <p>Real-time WebSocket streaming  ·  Token-by-token delivery</p>
+            <p>Real-time streaming + ElevenLabs TTS</p>
         </div>
 
         <div class="connection-bar">
@@ -244,20 +392,30 @@
             <button class="btn btn-connect" id="connectBtn" onclick="toggleConnection()">Connect</button>
         </div>
 
+        <div class="audio-bar">
+            <span class="vol-icon muted" id="volIcon" onclick="toggleTTS()">🔇</span>
+            <label>
+                <input type="checkbox" id="ttsToggle" onchange="onTTSToggle()">
+                Enable Voice
+            </label>
+            <select id="voiceSelect" disabled>
+                <option value="">Loading voices...</option>
+            </select>
+        </div>
+
         <div class="chat-log" id="chatLog"></div>
 
         <div class="input-area">
             <input type="text" id="messageInput" placeholder="Type a message..." disabled
-                   onkeydown="if(event.key==='Enter') sendMessage()">
+                onkeydown="if(event.key==='Enter') sendMessage()">
             <button class="btn btn-send" id="sendBtn" onclick="sendMessage()" disabled>Send</button>
         </div>
 
         <div class="metrics">
             First token: <span id="ttft">—</span>
-            &nbsp;·&nbsp;
-            Total tokens: <span id="tokenCount">—</span>
-            &nbsp;·&nbsp;
-            Duration: <span id="duration">—</span>
+            &nbsp;·&nbsp; Tokens: <span id="tokenCount">—</span>
+            &nbsp;·&nbsp; Duration: <span id="duration">—</span>
+            &nbsp;·&nbsp; Audio: <span id="audioStatus">off</span>
         </div>
     </div>
 
@@ -269,19 +427,94 @@
         let firstTokenTime = null;
         let tokenCounter = 0;
 
+        // ── Audio playback via Blob + Audio element ──
+        let audioChunks = [];       // accumulates raw byte arrays
+        let audioChunksReceived = 0;
+        let currentAudioEl = null;  // the <audio> element playing
+
         const EMOTION_EMOJI = {
             Happy: '😊', Sad: '😢', Anxious: '😰', Excited: '🤩',
             Calm: '😌', Angry: '😤', Tender: '🥰', Curious: '🤔',
             Playful: '😜', Neutral: '😐'
         };
 
+        // ── Load voices on startup ──
+        async function loadVoices() {
+            try {
+                const r = await fetch('http://127.0.0.1:8000/voices');
+                const data = await r.json();
+                const sel = document.getElementById('voiceSelect');
+                sel.innerHTML = '';
+                data.voices.forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = v.id;
+                    opt.textContent = v.name;
+                    sel.appendChild(opt);
+                });
+            } catch (e) {
+                console.warn('Could not load voices', e);
+            }
+        }
+        loadVoices();
+
+        function toggleTTS() {
+            const cb = document.getElementById('ttsToggle');
+            cb.checked = !cb.checked;
+            onTTSToggle();
+        }
+
+        function onTTSToggle() {
+            const on = document.getElementById('ttsToggle').checked;
+            document.getElementById('voiceSelect').disabled = !on;
+            const icon = document.getElementById('volIcon');
+            icon.textContent = on ? '🔊' : '🔇';
+            icon.className = 'vol-icon ' + (on ? 'active' : 'muted');
+            document.getElementById('audioStatus').textContent = on ? 'on' : 'off';
+        }
+
+        // ── Audio: collect chunks, then play as one smooth blob ──
+        function collectAudioChunk(base64Data) {
+            const binary = atob(base64Data);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            audioChunks.push(bytes);
+            audioChunksReceived++;
+        }
+
+        function playCollectedAudio() {
+            if (audioChunks.length === 0) return;
+
+            // Stop any previous playback
+            if (currentAudioEl) {
+                currentAudioEl.pause();
+                URL.revokeObjectURL(currentAudioEl.src);
+            }
+
+            // Merge all chunks into one blob
+            const blob = new Blob(audioChunks, { type: 'audio/mpeg' });
+            const url = URL.createObjectURL(blob);
+
+            const audio = new Audio(url);
+            audio.onended = () => {
+                URL.revokeObjectURL(url);
+                currentAudioEl = null;
+                document.getElementById('audioStatus').textContent = `✅ done`;
+            };
+            audio.onerror = (e) => {
+                console.error('Audio playback error', e);
+                document.getElementById('audioStatus').textContent = '❌ playback error';
+            };
+            currentAudioEl = audio;
+            audio.play();
+            document.getElementById('audioStatus').textContent = '🔊 playing...';
+        }
+
+        // ── Chat UI helpers ──
         function addLogEntry(type, content) {
             const log = document.getElementById('chatLog');
             const entry = document.createElement('div');
             entry.className = `log-entry ${type}`;
-
             const labels = { user: '👤 You', ai: '🤖 Humanic', system: '⚙️ System' };
-
             entry.innerHTML = `
                 <div class="label">${labels[type] || type}</div>
                 <div class="bubble"><div class="text">${content}</div></div>
@@ -292,16 +525,10 @@
         }
 
         function toggleConnection() {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.close();
-                return;
-            }
-
+            if (ws && ws.readyState === WebSocket.OPEN) { ws.close(); return; }
             const userId = document.getElementById('userId').value.trim() || 'test_voice_user';
             const url = `ws://127.0.0.1:8000/ws/chat/${userId}`;
-
             addLogEntry('system', `Connecting to <code>${url}</code>...`);
-
             ws = new WebSocket(url);
 
             ws.onopen = () => {
@@ -322,25 +549,17 @@
                         <span class="control-badge"><span class="emoji">${emoji}</span> ${data.emotion}</span>
                         <span class="control-badge">🎭 ${data.animation_trigger}</span>
                     `;
-
-                    // Start a new AI entry with cursor
                     currentAIEntry = addLogEntry('ai', '');
                     const textDiv = currentAIEntry.querySelector('.text');
                     currentTextEl = document.createElement('span');
                     textDiv.appendChild(currentTextEl);
-
                     const cursor = document.createElement('span');
-                    cursor.className = 'stream-cursor';
-                    cursor.id = 'activeCursor';
+                    cursor.className = 'stream-cursor'; cursor.id = 'activeCursor';
                     textDiv.appendChild(cursor);
-
-                    // Append control badges after text
-                    const badgeContainer = document.createElement('div');
-                    badgeContainer.innerHTML = badgeHTML;
-                    currentAIEntry.querySelector('.bubble').appendChild(badgeContainer);
-
-                    firstTokenTime = null;
-                    tokenCounter = 0;
+                    const bc = document.createElement('div');
+                    bc.innerHTML = badgeHTML;
+                    currentAIEntry.querySelector('.bubble').appendChild(bc);
+                    firstTokenTime = null; tokenCounter = 0; audioChunksReceived = 0;
                     streamStartTime = performance.now();
                 }
 
@@ -348,31 +567,43 @@
                     if (currentTextEl) {
                         if (!firstTokenTime) {
                             firstTokenTime = performance.now();
-                            document.getElementById('ttft').textContent =
-                                Math.round(firstTokenTime - streamStartTime) + 'ms';
+                            document.getElementById('ttft').textContent = Math.round(firstTokenTime - streamStartTime) + 'ms';
                         }
                         tokenCounter++;
                         document.getElementById('tokenCount').textContent = tokenCounter;
                         currentTextEl.textContent += data.token;
+                        document.getElementById('chatLog').scrollTop = document.getElementById('chatLog').scrollHeight;
+                    }
+                }
 
-                        const log = document.getElementById('chatLog');
-                        log.scrollTop = log.scrollHeight;
+                else if (data.type === 'audio_start') {
+                    audioChunks = [];
+                    audioChunksReceived = 0;
+                    document.getElementById('audioStatus').textContent = '🔊 buffering...';
+                }
+
+                else if (data.type === 'audio') {
+                    collectAudioChunk(data.data);
+                    document.getElementById('audioStatus').textContent = `🔊 buffering (${audioChunksReceived})`;
+                }
+
+                else if (data.type === 'audio_end') {
+                    // Now play everything as one smooth audio
+                    playCollectedAudio();
+                    if (currentAIEntry) {
+                        const badge = document.createElement('span');
+                        badge.className = 'audio-badge';
+                        badge.innerHTML = `🔊 Voice (${audioChunksReceived} chunks)`;
+                        currentAIEntry.querySelector('.bubble').appendChild(badge);
                     }
                 }
 
                 else if (data.type === 'end') {
-                    // Remove cursor
                     const cursor = document.getElementById('activeCursor');
                     if (cursor) cursor.remove();
-
                     const elapsed = performance.now() - streamStartTime;
-                    document.getElementById('duration').textContent =
-                        (elapsed / 1000).toFixed(1) + 's';
-
-                    currentTextEl = null;
-                    currentAIEntry = null;
-
-                    // Re-enable input
+                    document.getElementById('duration').textContent = (elapsed / 1000).toFixed(1) + 's';
+                    currentTextEl = null; currentAIEntry = null;
                     document.getElementById('messageInput').disabled = false;
                     document.getElementById('sendBtn').disabled = false;
                     document.getElementById('messageInput').focus();
@@ -404,9 +635,11 @@
             if (!msg || !ws || ws.readyState !== WebSocket.OPEN) return;
 
             const role = document.getElementById('roleSelect').value;
+            const ttsOn = document.getElementById('ttsToggle').checked;
+            const voiceId = ttsOn ? document.getElementById('voiceSelect').value : '';
 
             addLogEntry('user', msg);
-            ws.send(JSON.stringify({ message: msg, role: role }));
+            ws.send(JSON.stringify({ message: msg, role: role, voice_id: voiceId }));
 
             input.value = '';
             input.disabled = true;
@@ -414,4 +647,5 @@
         }
     </script>
 </body>
+
 </html>

@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     # ── ChromaDB ──
     CHROMA_PERSIST_DIR: str = "./chroma_data"
 
+    # ── ElevenLabs TTS ──
+    ELEVEN_API_KEY: str = ""
+    ELEVEN_VOICE_ID: str = "JBFqnCBsd6RMkjVDRZzb"  # "George" default
+    ELEVEN_MODEL_ID: str = "eleven_multilingual_v2"
+
     # ── Server ──
     APP_TITLE: str = "Humanic AI – Emotional Brain"
     APP_VERSION: str = "0.1.0"
