@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Humanic AI – Live Voice Test</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0f;
+            color: #e0e0e8;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 2rem;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 700px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #7c5cff, #ff6ec7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.3rem;
+        }
+        .header p {
+            font-size: 0.85rem;
+            color: #777;
+        }
+
+        /* Connection bar */
+        .connection-bar {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        .connection-bar select,
+        .connection-bar input {
+            flex: 1;
+            background: #151520;
+            border: 1px solid #2a2a3a;
+            border-radius: 10px;
+            padding: 0.65rem 1rem;
+            color: #e0e0e8;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .connection-bar input:focus,
+        .connection-bar select:focus {
+            border-color: #7c5cff;
+        }
+        .connection-bar select { max-width: 140px; }
+        .connection-bar input { max-width: 180px; }
+
+        .btn {
+            padding: 0.65rem 1.4rem;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-connect {
+            background: linear-gradient(135deg, #7c5cff, #6a4fff);
+            color: #fff;
+        }
+        .btn-connect:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(124, 92, 255, 0.4); }
+        .btn-connect.connected {
+            background: linear-gradient(135deg, #ff4d6a, #e0345a);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #555;
+            flex-shrink: 0;
+            transition: background 0.3s;
+        }
+        .status-dot.connected { background: #00e676; box-shadow: 0 0 8px #00e676; }
+        .status-dot.error { background: #ff4d6a; box-shadow: 0 0 8px #ff4d6a; }
+
+        /* Chat area */
+        .chat-log {
+            background: #12121c;
+            border: 1px solid #1e1e2e;
+            border-radius: 14px;
+            height: 400px;
+            overflow-y: auto;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            scroll-behavior: smooth;
+        }
+        .chat-log::-webkit-scrollbar { width: 6px; }
+        .chat-log::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
+
+        .log-entry {
+            margin-bottom: 1rem;
+            animation: fadeIn 0.2s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        .log-entry.user .bubble {
+            background: #1e1e35;
+            border-left: 3px solid #7c5cff;
+            padding: 0.8rem 1rem;
+            border-radius: 0 10px 10px 0;
+            margin-left: 0.5rem;
+        }
+        .log-entry.ai .bubble {
+            background: #1a1a28;
+            border-left: 3px solid #00e676;
+            padding: 0.8rem 1rem;
+            border-radius: 0 10px 10px 0;
+            margin-left: 0.5rem;
+        }
+        .log-entry .label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.3rem;
+            margin-left: 0.6rem;
+        }
+        .log-entry.user .label { color: #7c5cff; }
+        .log-entry.ai .label { color: #00e676; }
+
+        .log-entry .bubble .text { line-height: 1.55; font-size: 0.9rem; }
+
+        .control-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: #252540;
+            border-radius: 6px;
+            padding: 0.25rem 0.6rem;
+            font-size: 0.72rem;
+            margin-right: 0.4rem;
+            margin-top: 0.5rem;
+        }
+        .control-badge .emoji { font-size: 0.85rem; }
+
+        .stream-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1em;
+            background: #00e676;
+            animation: blink 0.8s infinite;
+            vertical-align: text-bottom;
+            margin-left: 2px;
+        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        /* System messages */
+        .log-entry.system .bubble {
+            background: transparent;
+            border-left: 3px solid #555;
+            padding: 0.4rem 1rem;
+            border-radius: 0 10px 10px 0;
+            margin-left: 0.5rem;
+            font-size: 0.78rem;
+            color: #666;
+            font-style: italic;
+        }
+        .log-entry.system .label { color: #555; }
+
+        /* Input area */
+        .input-area {
+            display: flex;
+            gap: 0.75rem;
+        }
+        .input-area input {
+            flex: 1;
+            background: #151520;
+            border: 1px solid #2a2a3a;
+            border-radius: 12px;
+            padding: 0.85rem 1.2rem;
+            color: #e0e0e8;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .input-area input:focus { border-color: #7c5cff; }
+        .input-area input:disabled { opacity: 0.4; }
+
+        .btn-send {
+            background: linear-gradient(135deg, #00e676, #00c853);
+            color: #0a0a0f;
+            min-width: 80px;
+        }
+        .btn-send:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0, 230, 118, 0.3); }
+        .btn-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* Latency counter */
+        .metrics {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1rem;
+            font-size: 0.75rem;
+            color: #555;
+        }
+        .metrics span { font-weight: 600; color: #7c5cff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎙️ Humanic AI — Live Voice Test</h1>
+            <p>Real-time WebSocket streaming  ·  Token-by-token delivery</p>
+        </div>
+
+        <div class="connection-bar">
+            <div class="status-dot" id="statusDot"></div>
+            <input type="text" id="userId" placeholder="User ID" value="test_voice_user">
+            <select id="roleSelect">
+                <option value="friend">Friend</option>
+                <option value="mentor">Mentor</option>
+                <option value="flirt">Flirt</option>
+                <option value="therapist">Therapist</option>
+                <option value="spiritual">Spiritual</option>
+                <option value="partner">Partner</option>
+            </select>
+            <button class="btn btn-connect" id="connectBtn" onclick="toggleConnection()">Connect</button>
+        </div>
+
+        <div class="chat-log" id="chatLog"></div>
+
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Type a message..." disabled
+                   onkeydown="if(event.key==='Enter') sendMessage()">
+            <button class="btn btn-send" id="sendBtn" onclick="sendMessage()" disabled>Send</button>
+        </div>
+
+        <div class="metrics">
+            First token: <span id="ttft">—</span>
+            &nbsp;·&nbsp;
+            Total tokens: <span id="tokenCount">—</span>
+            &nbsp;·&nbsp;
+            Duration: <span id="duration">—</span>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentAIEntry = null;
+        let currentTextEl = null;
+        let streamStartTime = null;
+        let firstTokenTime = null;
+        let tokenCounter = 0;
+
+        const EMOTION_EMOJI = {
+            Happy: '😊', Sad: '😢', Anxious: '😰', Excited: '🤩',
+            Calm: '😌', Angry: '😤', Tender: '🥰', Curious: '🤔',
+            Playful: '😜', Neutral: '😐'
+        };
+
+        function addLogEntry(type, content) {
+            const log = document.getElementById('chatLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+
+            const labels = { user: '👤 You', ai: '🤖 Humanic', system: '⚙️ System' };
+
+            entry.innerHTML = `
+                <div class="label">${labels[type] || type}</div>
+                <div class="bubble"><div class="text">${content}</div></div>
+            `;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+            return entry;
+        }
+
+        function toggleConnection() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+                return;
+            }
+
+            const userId = document.getElementById('userId').value.trim() || 'test_voice_user';
+            const url = `ws://127.0.0.1:8000/ws/chat/${userId}`;
+
+            addLogEntry('system', `Connecting to <code>${url}</code>...`);
+
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                document.getElementById('statusDot').className = 'status-dot connected';
+                document.getElementById('connectBtn').textContent = 'Disconnect';
+                document.getElementById('connectBtn').classList.add('connected');
+                document.getElementById('messageInput').disabled = false;
+                document.getElementById('sendBtn').disabled = false;
+                addLogEntry('system', '🟢 Connected! Start chatting.');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'control') {
+                    const emoji = EMOTION_EMOJI[data.emotion] || '😐';
+                    const badgeHTML = `
+                        <span class="control-badge"><span class="emoji">${emoji}</span> ${data.emotion}</span>
+                        <span class="control-badge">🎭 ${data.animation_trigger}</span>
+                    `;
+
+                    // Start a new AI entry with cursor
+                    currentAIEntry = addLogEntry('ai', '');
+                    const textDiv = currentAIEntry.querySelector('.text');
+                    currentTextEl = document.createElement('span');
+                    textDiv.appendChild(currentTextEl);
+
+                    const cursor = document.createElement('span');
+                    cursor.className = 'stream-cursor';
+                    cursor.id = 'activeCursor';
+                    textDiv.appendChild(cursor);
+
+                    // Append control badges after text
+                    const badgeContainer = document.createElement('div');
+                    badgeContainer.innerHTML = badgeHTML;
+                    currentAIEntry.querySelector('.bubble').appendChild(badgeContainer);
+
+                    firstTokenTime = null;
+                    tokenCounter = 0;
+                    streamStartTime = performance.now();
+                }
+
+                else if (data.type === 'stream') {
+                    if (currentTextEl) {
+                        if (!firstTokenTime) {
+                            firstTokenTime = performance.now();
+                            document.getElementById('ttft').textContent =
+                                Math.round(firstTokenTime - streamStartTime) + 'ms';
+                        }
+                        tokenCounter++;
+                        document.getElementById('tokenCount').textContent = tokenCounter;
+                        currentTextEl.textContent += data.token;
+
+                        const log = document.getElementById('chatLog');
+                        log.scrollTop = log.scrollHeight;
+                    }
+                }
+
+                else if (data.type === 'end') {
+                    // Remove cursor
+                    const cursor = document.getElementById('activeCursor');
+                    if (cursor) cursor.remove();
+
+                    const elapsed = performance.now() - streamStartTime;
+                    document.getElementById('duration').textContent =
+                        (elapsed / 1000).toFixed(1) + 's';
+
+                    currentTextEl = null;
+                    currentAIEntry = null;
+
+                    // Re-enable input
+                    document.getElementById('messageInput').disabled = false;
+                    document.getElementById('sendBtn').disabled = false;
+                    document.getElementById('messageInput').focus();
+                }
+
+                else if (data.type === 'error') {
+                    addLogEntry('system', `⚠️ ${data.detail}`);
+                }
+            };
+
+            ws.onclose = () => {
+                document.getElementById('statusDot').className = 'status-dot';
+                document.getElementById('connectBtn').textContent = 'Connect';
+                document.getElementById('connectBtn').classList.remove('connected');
+                document.getElementById('messageInput').disabled = true;
+                document.getElementById('sendBtn').disabled = true;
+                addLogEntry('system', '🔴 Disconnected.');
+            };
+
+            ws.onerror = () => {
+                document.getElementById('statusDot').className = 'status-dot error';
+                addLogEntry('system', '❌ Connection error.');
+            };
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const msg = input.value.trim();
+            if (!msg || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+            const role = document.getElementById('roleSelect').value;
+
+            addLogEntry('user', msg);
+            ws.send(JSON.stringify({ message: msg, role: role }));
+
+            input.value = '';
+            input.disabled = true;
+            document.getElementById('sendBtn').disabled = true;
+        }
+    </script>
+</body>
+</html>
