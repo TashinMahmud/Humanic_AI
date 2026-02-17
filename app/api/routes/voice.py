@@ -1,17 +1,22 @@
 """
 Humanic AI – Real-Time Voice WebSocket Endpoint
 Streams GPT-4o responses token-by-token over WebSocket for low-latency
-voice interface support. Optionally pipes text through ElevenLabs TTS
-for real-time audio streaming.
+voice interface support. Handles both text and audio (STT) input.
+Optionally pipes text through ElevenLabs TTS for real-time audio output.
+Persists all messages via SQLite chat history.
 
 Protocol:
   1. Client connects to /ws/chat/{user_id}
-  2. Client sends JSON text frame: {"message": "...", "role": "friend", "voice_id": "..."}
-  3. Server sends CONTROL packet:  {"type": "control", "emotion": "...", "animation_trigger": "..."}
-  4. Server sends STREAM packets:  {"type": "stream", "token": "..."} (one per token)
-  5. Server sends AUDIO packets:   raw binary frames (MPEG audio chunks)
-  6. Server sends END packet:      {"type": "end", "full_text": "..."}
-  7. Connection stays open for next message.
+  2. Client sends JSON text frame:
+       {"message": "...", "role": "friend", "voice_id": "...", "session_id": "..."}
+     OR binary audio frame (raw webm/wav blob from MediaRecorder)
+  3. For audio input, server responds with:
+       {"type": "transcript", "text": "..."}
+  4. Server sends CONTROL packet:  {"type": "control", "emotion": "...", "animation_trigger": "..."}
+  5. Server sends STREAM packets:  {"type": "stream", "token": "..."} (one per token)
+  6. Server sends AUDIO packets:   {"type": "audio", "data": "<base64>"} (if TTS enabled)
+  7. Server sends END packet:      {"type": "end", "full_text": "..."}
+  8. Connection stays open for next message.
 """
 
 import base64
@@ -23,9 +28,11 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from openai import OpenAI
 
 from app.core.config import settings
+from app.data.history_manager import add_message, get_history, create_session
 from app.data.memory_manager import intelligent_extract, retrieve_memories, save_memory
 from app.services.ai_engine import AIResponse
 from app.services.personalities import get_personality
+from app.services.stt import transcribe
 from app.services.tts import VOICE_OPTIONS, generate_audio
 
 logger = logging.getLogger(__name__)
@@ -44,35 +51,86 @@ def _get_openai() -> OpenAI:
 
 @router.websocket("/ws/chat/{user_id}")
 async def voice_chat(websocket: WebSocket, user_id: str):
-    """Real-time streaming chat over WebSocket with optional TTS audio."""
+    """Real-time streaming chat over WebSocket with STT, TTS, and history."""
     await websocket.accept()
     logger.info("WebSocket connected: user=%s", user_id)
 
-    # ── In-session conversation history ──
+    # ── Session state ──
+    session_id: str | None = None
+    role: str = "friend"
+    voice_id: str = ""
     conversation_history: list[dict[str, str]] = []
     MAX_HISTORY = 20
 
     try:
         while True:
-            # ── Receive message ──
-            raw = await websocket.receive_text()
-            try:
-                data = json.loads(raw)
-            except json.JSONDecodeError:
-                await websocket.send_json({"type": "error", "detail": "Invalid JSON"})
-                continue
+            # ── Receive frame (text JSON or binary audio) ──
+            ws_message = await websocket.receive()
 
-            message = data.get("message", "").strip()
-            role = data.get("role", "friend")
-            voice_id = data.get("voice_id", "")  # Empty = no TTS
+            message_text: str = ""
+
+            if "text" in ws_message:
+                # ── JSON text frame ──
+                try:
+                    data = json.loads(ws_message["text"])
+                except json.JSONDecodeError:
+                    await websocket.send_json({"type": "error", "detail": "Invalid JSON"})
+                    continue
+
+                message_text = data.get("message", "").strip()
+                role = data.get("role", role)
+                voice_id = data.get("voice_id", voice_id)
+
+                # Session management
+                if data.get("session_id"):
+                    session_id = data["session_id"]
+
+                # Config-only frame (no message to process)
+                if data.get("type") == "config":
+                    continue
+
+            elif "bytes" in ws_message:
+                # ── Binary audio frame → STT ──
+                audio_bytes = ws_message["bytes"]
+                if not audio_bytes:
+                    continue
+
+                logger.info("Received audio: %d bytes from user=%s", len(audio_bytes), user_id)
+                message_text = transcribe(audio_bytes, file_format="webm")
+
+                if not message_text:
+                    await websocket.send_json({
+                        "type": "transcript",
+                        "text": "",
+                        "status": "no_speech_detected",
+                    })
+                    continue
+
+                # Send transcript back so client shows what was heard
+                await websocket.send_json({
+                    "type": "transcript",
+                    "text": message_text,
+                })
+
+            # ── Create session if needed ──
+            if not session_id:
+                session_id = create_session()
+                await websocket.send_json({
+                    "type": "session",
+                    "session_id": session_id,
+                })
+
             enable_tts = bool(voice_id)
 
-            if not message:
+            if not message_text:
                 await websocket.send_json({"type": "error", "detail": "Empty message"})
                 continue
 
-            # ── 1. Retrieve memories ──
-            memories = retrieve_memories(user_id, message, top_k=5)
+            # ── 1. Save user message to history ──
+            add_message(session_id, "user", message_text)
+
+            # ── 2. Retrieve memories ──
+            memories = retrieve_memories(user_id, message_text, top_k=5)
             memory_context = ""
             if memories:
                 memory_block = "\n".join(f"- {m}" for m in memories)
@@ -87,10 +145,10 @@ async def voice_chat(websocket: WebSocket, user_id: str):
             messages = [
                 {"role": "system", "content": system_prompt},
                 *conversation_history[-MAX_HISTORY:],
-                {"role": "user", "content": message},
+                {"role": "user", "content": message_text},
             ]
 
-            # ── 2. Quick pre-pass: get emotion + animation ──
+            # ── 3. Quick pre-pass: get emotion + animation ──
             try:
                 meta_completion = client.beta.chat.completions.parse(
                     model=settings.MODEL_NAME,
@@ -106,14 +164,14 @@ async def voice_chat(websocket: WebSocket, user_id: str):
                 emotion = "Neutral"
                 animation = "NOD_COMPASSION"
 
-            # ── 3. Send CONTROL packet ──
+            # ── 4. Send CONTROL packet ──
             await websocket.send_json({
                 "type": "control",
                 "emotion": emotion,
                 "animation_trigger": animation,
             })
 
-            # ── 4. Stream the reply token-by-token ──
+            # ── 5. Stream the reply token-by-token ──
             full_text = ""
 
             stream = client.chat.completions.create(
@@ -134,7 +192,7 @@ async def voice_chat(websocket: WebSocket, user_id: str):
                         "token": token,
                     })
 
-            # ── 5. Stream TTS audio (if voice_id provided) ──
+            # ── 6. Stream TTS audio (if voice_id provided) ──
             if enable_tts and full_text.strip():
                 await websocket.send_json({"type": "audio_start"})
 
@@ -146,18 +204,21 @@ async def voice_chat(websocket: WebSocket, user_id: str):
 
                 await websocket.send_json({"type": "audio_end"})
 
-            # ── 6. Send END packet ──
+            # ── 7. Send END packet ──
             await websocket.send_json({
                 "type": "end",
                 "full_text": full_text,
             })
 
-            # ── 7. Update conversation history ──
-            conversation_history.append({"role": "user", "content": message})
+            # ── 8. Save AI response to history ──
+            add_message(session_id, "assistant", full_text)
+
+            # ── 9. Update in-memory conversation context ──
+            conversation_history.append({"role": "user", "content": message_text})
             conversation_history.append({"role": "assistant", "content": full_text})
 
-            # ── 8. Background: extract and save facts ──
-            facts = intelligent_extract(message)
+            # ── 10. Background: extract and save facts ──
+            facts = intelligent_extract(message_text)
             for fact in facts:
                 save_memory(user_id, fact, metadata={"source": "voice", "role": role})
                 logger.info("Saved fact for %s: %s", user_id, fact[:60])
@@ -176,3 +237,10 @@ async def voice_chat(websocket: WebSocket, user_id: str):
 async def list_voices():
     """Return available TTS voice options for the frontend."""
     return {"voices": VOICE_OPTIONS}
+
+
+@router.get("/history/{session_id}", tags=["Voice"])
+async def fetch_history(session_id: str, limit: int = 20):
+    """Return message history for a session."""
+    messages = get_history(session_id, limit=limit)
+    return {"session_id": session_id, "messages": messages}

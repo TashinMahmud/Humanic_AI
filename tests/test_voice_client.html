@@ -39,6 +39,7 @@
             font-weight: 700;
             background: linear-gradient(135deg, #7c5cff, #ff6ec7);
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 0.3rem;
         }
@@ -272,6 +273,19 @@
             color: #5ca5ff;
         }
 
+        .transcript-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: #1a3520;
+            border: 1px solid #2a6a3a;
+            border-radius: 6px;
+            padding: 0.25rem 0.6rem;
+            font-size: 0.72rem;
+            margin-top: 0.5rem;
+            color: #5cff7c;
+        }
+
         .stream-cursor {
             display: inline-block;
             width: 2px;
@@ -354,6 +368,44 @@
             box-shadow: none;
         }
 
+        .btn-mic {
+            background: linear-gradient(135deg, #ff6ec7, #ff4da6);
+            color: #fff;
+            min-width: 50px;
+            font-size: 1.1rem;
+            position: relative;
+        }
+
+        .btn-mic:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(255, 110, 199, 0.4);
+        }
+
+        .btn-mic.recording {
+            background: linear-gradient(135deg, #ff2222, #cc0000);
+            animation: pulse-mic 0.8s infinite;
+        }
+
+        @keyframes pulse-mic {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 34, 34, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 0 8px rgba(255, 34, 34, 0);
+            }
+        }
+
+        .btn-mic:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+            animation: none;
+        }
+
         .metrics {
             display: flex;
             justify-content: center;
@@ -368,6 +420,10 @@
             font-weight: 600;
             color: #7c5cff;
         }
+
+        .history-entry .bubble {
+            opacity: 0.7;
+        }
     </style>
 </head>
 
@@ -375,7 +431,7 @@
     <div class="container">
         <div class="header">
             <h1>🎙️ Humanic AI — Live Voice Test</h1>
-            <p>Real-time streaming + ElevenLabs TTS</p>
+            <p>Real-time streaming + STT + TTS + Chat History</p>
         </div>
 
         <div class="connection-bar">
@@ -408,6 +464,8 @@
         <div class="input-area">
             <input type="text" id="messageInput" placeholder="Type a message..." disabled
                 onkeydown="if(event.key==='Enter') sendMessage()">
+            <button class="btn btn-mic" id="micBtn" disabled onmousedown="startMic()" onmouseup="stopMic()"
+                ontouchstart="startMic()" ontouchend="stopMic()">🎤</button>
             <button class="btn btn-send" id="sendBtn" onclick="sendMessage()" disabled>Send</button>
         </div>
 
@@ -426,11 +484,16 @@
         let streamStartTime = null;
         let firstTokenTime = null;
         let tokenCounter = 0;
+        let currentSessionId = null;
 
         // ── Audio playback via Blob + Audio element ──
-        let audioChunks = [];       // accumulates raw byte arrays
+        let audioChunks = [];
         let audioChunksReceived = 0;
-        let currentAudioEl = null;  // the <audio> element playing
+        let currentAudioEl = null;
+
+        // ── Mic recording ──
+        let mediaRecorder = null;
+        let recordedChunks = [];
 
         const EMOTION_EMOJI = {
             Happy: '😊', Sad: '😢', Anxious: '😰', Excited: '🤩',
@@ -483,22 +546,17 @@
 
         function playCollectedAudio() {
             if (audioChunks.length === 0) return;
-
-            // Stop any previous playback
             if (currentAudioEl) {
                 currentAudioEl.pause();
                 URL.revokeObjectURL(currentAudioEl.src);
             }
-
-            // Merge all chunks into one blob
             const blob = new Blob(audioChunks, { type: 'audio/mpeg' });
             const url = URL.createObjectURL(blob);
-
             const audio = new Audio(url);
             audio.onended = () => {
                 URL.revokeObjectURL(url);
                 currentAudioEl = null;
-                document.getElementById('audioStatus').textContent = `✅ done`;
+                document.getElementById('audioStatus').textContent = '✅ done';
             };
             audio.onerror = (e) => {
                 console.error('Audio playback error', e);
@@ -509,11 +567,73 @@
             document.getElementById('audioStatus').textContent = '🔊 playing...';
         }
 
+        // ── Mic Recording (hold to talk: press to start, release to send) ──
+        let micStream = null;  // acquired once, kept alive
+
+        async function ensureMicStream() {
+            if (micStream && micStream.active) return micStream;
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            return micStream;
+        }
+
+        async function startMic() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            if (mediaRecorder && mediaRecorder.state === 'recording') return;
+            try {
+                const stream = await ensureMicStream();
+                recordedChunks = [];
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    if (recordedChunks.length === 0) return;
+
+                    // Send config first so server knows voice_id & role
+                    const ttsOn = document.getElementById('ttsToggle').checked;
+                    const voiceId = ttsOn ? document.getElementById('voiceSelect').value : '';
+                    const role = document.getElementById('roleSelect').value;
+                    ws.send(JSON.stringify({
+                        type: 'config',
+                        voice_id: voiceId,
+                        role: role,
+                        session_id: currentSessionId || '',
+                    }));
+
+                    // Then send audio blob
+                    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    ws.send(blob);
+                    addLogEntry('system', '🎤 Audio sent for transcription...');
+
+                    document.getElementById('messageInput').disabled = true;
+                    document.getElementById('sendBtn').disabled = true;
+                    mediaRecorder = null;
+                };
+
+                mediaRecorder.start();
+                document.getElementById('micBtn').classList.add('recording');
+                document.getElementById('micBtn').textContent = '⏹️';
+            } catch (e) {
+                console.error('Mic access denied', e);
+                addLogEntry('system', '❌ Microphone access denied.');
+            }
+        }
+
+        function stopMic() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                document.getElementById('micBtn').classList.remove('recording');
+                document.getElementById('micBtn').textContent = '🎤';
+            }
+        }
+
         // ── Chat UI helpers ──
-        function addLogEntry(type, content) {
+        function addLogEntry(type, content, extraClass = '') {
             const log = document.getElementById('chatLog');
             const entry = document.createElement('div');
-            entry.className = `log-entry ${type}`;
+            entry.className = `log-entry ${type} ${extraClass}`;
             const labels = { user: '👤 You', ai: '🤖 Humanic', system: '⚙️ System' };
             entry.innerHTML = `
                 <div class="label">${labels[type] || type}</div>
@@ -522,6 +642,23 @@
             log.appendChild(entry);
             log.scrollTop = log.scrollHeight;
             return entry;
+        }
+
+        // ── Load session history ──
+        async function loadHistory(sessionId) {
+            try {
+                const r = await fetch(`http://127.0.0.1:8000/history/${sessionId}?limit=20`);
+                const data = await r.json();
+                if (data.messages && data.messages.length > 0) {
+                    addLogEntry('system', `📜 Loaded ${data.messages.length} messages from history`);
+                    data.messages.forEach(msg => {
+                        const type = msg.role === 'user' ? 'user' : 'ai';
+                        addLogEntry(type, msg.content, 'history-entry');
+                    });
+                }
+            } catch (e) {
+                console.warn('Could not load history', e);
+            }
         }
 
         function toggleConnection() {
@@ -537,13 +674,43 @@
                 document.getElementById('connectBtn').classList.add('connected');
                 document.getElementById('messageInput').disabled = false;
                 document.getElementById('sendBtn').disabled = false;
-                addLogEntry('system', '🟢 Connected! Start chatting.');
+                document.getElementById('micBtn').disabled = false;
+                addLogEntry('system', '🟢 Connected! Start chatting or hold 🎤 to speak.');
+
+                // If we have a session, load its history
+                if (currentSessionId) {
+                    loadHistory(currentSessionId);
+                }
             };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
 
-                if (data.type === 'control') {
+                if (data.type === 'session') {
+                    currentSessionId = data.session_id;
+                    addLogEntry('system', `📋 Session: <code>${data.session_id.slice(0, 8)}...</code>`);
+                }
+
+                else if (data.type === 'transcript') {
+                    // Show what Whisper heard
+                    if (data.text) {
+                        addLogEntry('user', data.text);
+                        // Re-enable inputs
+                        document.getElementById('messageInput').disabled = false;
+                        document.getElementById('sendBtn').disabled = false;
+                        // Reset metrics for the coming AI response
+                        firstTokenTime = null;
+                        tokenCounter = 0;
+                        audioChunksReceived = 0;
+                        streamStartTime = performance.now();
+                    } else {
+                        addLogEntry('system', '🎤 No speech detected — try again.');
+                        document.getElementById('messageInput').disabled = false;
+                        document.getElementById('sendBtn').disabled = false;
+                    }
+                }
+
+                else if (data.type === 'control') {
                     const emoji = EMOTION_EMOJI[data.emotion] || '😐';
                     const badgeHTML = `
                         <span class="control-badge"><span class="emoji">${emoji}</span> ${data.emotion}</span>
@@ -559,8 +726,12 @@
                     const bc = document.createElement('div');
                     bc.innerHTML = badgeHTML;
                     currentAIEntry.querySelector('.bubble').appendChild(bc);
-                    firstTokenTime = null; tokenCounter = 0; audioChunksReceived = 0;
-                    streamStartTime = performance.now();
+                    if (!firstTokenTime) {
+                        firstTokenTime = null;
+                        tokenCounter = 0;
+                        audioChunksReceived = 0;
+                        streamStartTime = performance.now();
+                    }
                 }
 
                 else if (data.type === 'stream') {
@@ -588,7 +759,6 @@
                 }
 
                 else if (data.type === 'audio_end') {
-                    // Now play everything as one smooth audio
                     playCollectedAudio();
                     if (currentAIEntry) {
                         const badge = document.createElement('span');
@@ -611,6 +781,8 @@
 
                 else if (data.type === 'error') {
                     addLogEntry('system', `⚠️ ${data.detail}`);
+                    document.getElementById('messageInput').disabled = false;
+                    document.getElementById('sendBtn').disabled = false;
                 }
             };
 
@@ -620,6 +792,7 @@
                 document.getElementById('connectBtn').classList.remove('connected');
                 document.getElementById('messageInput').disabled = true;
                 document.getElementById('sendBtn').disabled = true;
+                document.getElementById('micBtn').disabled = true;
                 addLogEntry('system', '🔴 Disconnected.');
             };
 
@@ -639,11 +812,20 @@
             const voiceId = ttsOn ? document.getElementById('voiceSelect').value : '';
 
             addLogEntry('user', msg);
-            ws.send(JSON.stringify({ message: msg, role: role, voice_id: voiceId }));
+            ws.send(JSON.stringify({
+                message: msg,
+                role: role,
+                voice_id: voiceId,
+                session_id: currentSessionId || '',
+            }));
 
             input.value = '';
             input.disabled = true;
             document.getElementById('sendBtn').disabled = true;
+            firstTokenTime = null;
+            tokenCounter = 0;
+            audioChunksReceived = 0;
+            streamStartTime = performance.now();
         }
     </script>
 </body>

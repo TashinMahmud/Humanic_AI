@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 chroma_data/
+chat_data/
 .venv/
 venv/
 *.egg-info/

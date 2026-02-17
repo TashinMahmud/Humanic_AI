@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # ── ChromaDB ──
     CHROMA_PERSIST_DIR: str = "./chroma_data"
 
+    # ── Chat History ──
+    CHAT_DB_DIR: str = "./chat_data"
+
     # ── ElevenLabs TTS ──
     ELEVEN_API_KEY: str = ""
     ELEVEN_VOICE_ID: str = "JBFqnCBsd6RMkjVDRZzb"  # "George" default
