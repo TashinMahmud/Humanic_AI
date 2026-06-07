@@ -486,7 +486,8 @@
         // ── Connect ──
         function connect() {
             const userId = 'avatar_user';
-            ws = new WebSocket(`ws://${location.host}/ws/chat/${userId}`);
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${location.host}/ws/chat/${userId}`);
 
             ws.onopen = () => {
                 document.getElementById('connectScreen').classList.add('hidden');
