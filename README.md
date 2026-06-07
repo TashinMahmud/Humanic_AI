@@ -5,11 +5,12 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi&logoColor=white)](#quick-start)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--Structured-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/)
+[![Groq](https://img.shields.io/badge/Groq-llama--3.3-orange?style=for-the-badge)](#quick-start)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_Memory-0284C7?style=for-the-badge)](#memory-architecture)
 
 ---
 
-**Humanic AI** is the premium "Emotional Brain" microservice powering the Humanic interactive avatar system. Built with **FastAPI**, **ChromaDB**, and **OpenAI Structured Outputs**, it maintains session-scoped multi-turn conversation memory, automatically extracts and stores user-specific facts, conducts real-time content moderation, and returns structured speech replies along with emotion markers and 3D avatar animation triggers.
+**Humanic AI** is the premium "Emotional Brain" microservice powering the Humanic interactive avatar system. Built with **FastAPI**, **ChromaDB**, **OpenAI Structured Outputs**, and **Groq**, it maintains session-scoped multi-turn conversation memory, automatically extracts and stores user-specific facts, conducts real-time content moderation, and returns structured speech replies along with emotion markers and 3D avatar animation triggers. When Groq is used as the provider, it automatically leverages custom JSON-schema parsing and gracefully bypasses OpenAI-only moderation checks to ensure seamless development and deployment.
 
 </div>
 
@@ -126,6 +127,10 @@ MODEL_NAME=gpt-4o
 DEBUG=False
 APP_TITLE="Humanic AI Companion Engine"
 APP_VERSION="1.2.0"
+
+# Optional: Set GROQ API Key to run completions on Groq instead of OpenAI
+GROQ_API_KEY=gsk_your-groq-key-here
+GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
 ### 3. Installation & Run
