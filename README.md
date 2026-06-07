@@ -7,6 +7,8 @@
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--Structured-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/)
 [![Groq](https://img.shields.io/badge/Groq-llama--3.3-orange?style=for-the-badge)](#quick-start)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_Memory-0284C7?style=for-the-badge)](#memory-architecture)
+<br/>
+[![Live Demo](https://img.shields.io/badge/Demo-humanic--ai.onrender.com-FF5733?style=for-the-badge&logo=google-chrome&logoColor=white)](https://humanic-ai.onrender.com)
 
 ---
 
