@@ -5,6 +5,7 @@ Uses OpenAI Structured Outputs for reliable emotion/animation metadata.
 
 import logging
 import uuid
+import json
 from enum import Enum
 from typing import Literal
 
@@ -24,7 +25,12 @@ _openai_client: OpenAI | None = None
 def _get_openai() -> OpenAI:
     global _openai_client
     if _openai_client is None:
-        _openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        if settings.GROQ_API_KEY:
+            _openai_client = OpenAI(api_key=settings.GROQ_API_KEY, base_url="https://api.groq.com/openai/v1")
+        else:
+            if not settings.OPENAI_API_KEY:
+                raise ValueError("Neither OPENAI_API_KEY nor GROQ_API_KEY is set in environment.")
+            _openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
     return _openai_client
 
 
@@ -132,16 +138,55 @@ def generate_response(
         {"role": "user", "content": message},
     ]
 
-    # 4. Call OpenAI with Structured Outputs
+    # 4. Call OpenAI/Groq for response
     client = _get_openai()
-    completion = client.beta.chat.completions.parse(
-        model=settings.MODEL_NAME,
-        messages=messages,
-        response_format=AIResponse,
-        temperature=0.85,
-    )
+    if settings.GROQ_API_KEY:
+        schema_instruction = """
+        You must return a valid JSON object matching this schema:
+        {
+          "reply_text": "string (conversational reply to the user)",
+          "emotion": "Happy" | "Sad" | "Anxious" | "Excited" | "Calm" | "Angry" | "Tender" | "Curious" | "Playful" | "Neutral",
+          "animation_trigger": "NOD_COMPASSION" | "SMILE_WARM" | "LEAN_FORWARD" | "WAVE_HELLO" | "HEAD_TILT_CURIOUS" | "LAUGH_GENTLE" | "HUG_VIRTUAL" | "SIGH_EMPATHY" | "CELEBRATE" | "THINK_DEEP" | "LISTEN_INTENT" | "COMFORT_PAT" | "EYEBROW_RAISE" | "WINK_PLAYFUL" | "HAND_HEART" | "BREATHE_CALM" | "POINT_ENCOURAGE" | "SHRUG_CASUAL" | "FIST_BUMP" | "TEAR_WIPE"
+        }
+        Return ONLY valid JSON. Do not include markdown formatting or extra text outside the JSON.
+        """
+        messages_with_schema = list(messages)
+        messages_with_schema[0] = {
+            "role": "system",
+            "content": messages[0]["content"] + "\n\n" + schema_instruction
+        }
+        
+        completion = client.chat.completions.create(
+            model=settings.GROQ_MODEL or "llama-3.3-70b-versatile",
+            messages=messages_with_schema,
+            response_format={"type": "json_object"},
+            temperature=0.85,
+        )
+        content = (completion.choices[0].message.content or "{}").strip()
+        parsed_json = json.loads(content)
+        
+        # Safe enum values lookup
+        emotion_val = parsed_json.get("emotion", "Neutral")
+        if emotion_val not in [e.value for e in EmotionType]:
+            emotion_val = "Neutral"
+            
+        anim_val = parsed_json.get("animation_trigger", "LISTEN_INTENT")
+        if anim_val not in [a.value for a in AnimationTrigger]:
+            anim_val = "LISTEN_INTENT"
 
-    ai_response: AIResponse = completion.choices[0].message.parsed  # type: ignore[assignment]
+        ai_response = AIResponse(
+            reply_text=parsed_json.get("reply_text", "Hmm, let me think about that."),
+            emotion=EmotionType(emotion_val),
+            animation_trigger=AnimationTrigger(anim_val)
+        )
+    else:
+        completion = client.beta.chat.completions.parse(
+            model=settings.MODEL_NAME,
+            messages=messages,
+            response_format=AIResponse,
+            temperature=0.85,
+        )
+        ai_response = completion.choices[0].message.parsed  # type: ignore[assignment]
 
     # 5. Update conversation history
     history.append({"role": "user", "content": message})

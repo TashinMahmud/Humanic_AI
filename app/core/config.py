@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     MODEL_NAME: str = "gpt-4o"
 
+    # ── Groq ──
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+
     # ── ChromaDB ──
     CHROMA_PERSIST_DIR: str = "./chroma_data"
 

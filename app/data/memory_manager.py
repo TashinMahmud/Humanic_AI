@@ -26,7 +26,12 @@ _openai_client: OpenAI | None = None
 def _get_openai() -> OpenAI:
     global _openai_client
     if _openai_client is None:
-        _openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        if settings.GROQ_API_KEY:
+            _openai_client = OpenAI(api_key=settings.GROQ_API_KEY, base_url="https://api.groq.com/openai/v1")
+        else:
+            if not settings.OPENAI_API_KEY:
+                raise ValueError("Neither OPENAI_API_KEY nor GROQ_API_KEY is set in environment.")
+            _openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
     return _openai_client
 
 
@@ -143,9 +148,10 @@ def intelligent_extract(user_text: str) -> list[str]:
         return []
 
     client = _get_openai()
+    model_name = settings.GROQ_MODEL if settings.GROQ_API_KEY else "gpt-4o-mini"
     try:
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model_name,
             messages=[
                 {"role": "system", "content": _EXTRACT_SYSTEM_PROMPT},
                 {"role": "user", "content": user_text},

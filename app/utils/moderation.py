@@ -28,6 +28,10 @@ def check_moderation(text: str) -> tuple[bool, list[str]]:
     Returns:
         (is_flagged, flagged_category_names)
     """
+    if not settings.OPENAI_API_KEY:
+        logger.debug("OPENAI_API_KEY is not configured – bypassing safety moderation check")
+        return False, []
+
     client = _get_openai()
     try:
         response = client.moderations.create(
