@@ -1,10 +1,23 @@
-# Humanic AI — Emotional Brain Backend
+# 🤖 Humanic AI — Emotional Brain Companion Engine
 
-> **AI orchestration engine** with multi-role personalities, long-term vector memory, real-time 3D animation metadata, and built-in safety moderation.
+<div align="center">
+
+[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi&logoColor=white)](#quick-start)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--Structured-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/)
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_Memory-0284C7?style=for-the-badge)](#memory-architecture)
 
 ---
 
-## Architecture
+**Humanic AI** is the premium "Emotional Brain" microservice powering the Humanic interactive avatar system. Built with **FastAPI**, **ChromaDB**, and **OpenAI Structured Outputs**, it maintains session-scoped multi-turn conversation memory, automatically extracts and stores user-specific facts, conducts real-time content moderation, and returns structured speech replies along with emotion markers and 3D avatar animation triggers.
+
+</div>
+
+---
+
+## 🛠️ Technical Architecture
+
+Humanic AI serves as a companion orchestration engine designed to sit behind a traditional client authentication proxy.
 
 ```
 ┌──────────────┐        ┌───────────────────────────────────┐
@@ -12,181 +25,135 @@
 │  (Flutter /  │  REST  │  (Auth, Payments, User Profiles)  │
 │   React Native)       │                                   │
 └──────────────┘        └───────────┬───────────────────────┘
-                                    │  HTTP POST
-                                    ▼
+                                    │  HTTP POST /chat
+                                    v
                         ┌───────────────────────────────────┐
                         │       Humanic AI Engine           │
-                        │       (this service)              │
                         │                                   │
                         │  POST /api/v1/chat                │
                         │  GET  /health                     │
                         │                                   │
-                        │  ┌─────────┐  ┌──────────────┐   │
-                        │  │ChromaDB │  │ OpenAI GPT-4o│   │
-                        │  │(Memory) │  │  + Moderation│   │
-                        │  └─────────┘  └──────────────┘   │
-                        └───────────────────────────────────┘
+                        │  ┌─────────┐  ┌──────────────┐    │
+                        │  │ChromaDB │  │ OpenAI GPT-4o│    │
+                        │  │(Memory) │  │  + Moderation│    │
+                        │  │         │  │              │    │
+                        │  └────┬────┘  └──────┬───────┘    │
+                        └───────┼──────────────┼────────────┘
+                                v              v
+                    [ ChromaDB Vector VDB ]  [ OpenAI Structured API ]
+                     - retrieve_memories()    - beta.chat.completions.parse()
+                     - save_memory()          - enforce_moderation()
 ```
+
+### Core Code Modules & Responsibilities
+
+*   `app/api/` Layer:
+    *   [`routes/chat.py`](app/api/routes/chat.py): Central gateway handling request parsing, safety moderation, AI engine orchestration, and HTTP responses.
+    *   [`routes/voice.py`](app/api/routes/voice.py): Media routes for fetching audio segments.
+*   `app/services/` Layer:
+    *   [`ai_engine.py`](app/services/ai_engine.py): Main agent loop, structured outputs compiler, OpenAI client initialization, and session history management.
+    *   [`personalities.py`](app/services/personalities.py): Prompts and instructions defining the companion roles (`mentor`, `friend`, `flirt`, `therapist`, `spiritual`, `partner`).
+*   `app/data/` Layer:
+    *   [`memory_manager.py`](app/data/memory_manager.py): ChromaDB client wrapper executing memory retrievals, embedding insertions, and fact-extraction completions.
+*   `app/utils/` Layer:
+    *   [`moderation.py`](app/utils/moderation.py): Integrates the OpenAI Moderation API to screen and block unsafe entries.
 
 ---
 
-## Handshake Protocol
+## ⚡ Core Integration Interfaces
 
-Your **traditional backend** (Node.js, Django, etc.) acts as a proxy between the mobile app and this AI engine. Here's the recommended flow:
+<details>
+<summary><b>🤝 Client Handshake Protocol</b></summary>
 
-### 1. Client → Traditional Backend
-The mobile app sends the user's message along with authentication headers:
+Clients route messages through a primary proxy server which appends a consistent `user_id` and `session_id`.
+*   **Request (Backend → AI Engine)**:
+    ```http
+    POST /api/v1/chat
+    Content-Type: application/json
 
-```http
-POST /api/messages
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
+    {
+      "user_id": "usr_abc123",
+      "message": "I'm feeling anxious about my interview tomorrow",
+      "role": "therapist",
+      "session_id": "sess_xyz789"
+    }
+    ```
+*   **Response (AI Engine → Backend)**:
+    ```json
+    {
+      "text": "That's completely understandable — interviews can feel overwhelming...",
+      "emotion": "Anxious",
+      "animation_trigger": "BREATHE_CALM",
+      "audio_url": null,
+      "session_id": "sess_xyz789"
+    }
+    ```
+</details>
 
-{
-  "message": "I'm feeling anxious about my interview tomorrow",
-  "role": "therapist"
-}
-```
+<details>
+<summary><b>🧠 ChromaDB Long-Term Memory</b></summary>
 
-### 2. Traditional Backend → AI Engine
-Your backend authenticates the user, then forwards the request to this service:
+For every user request:
+1.  The engine performs a semantic vector search on ChromaDB for memories tied to the `user_id`.
+2.  Retrieved facts are injected as context in the system prompt.
+3.  Following completion, a background task uses `gpt-4o-mini` to extract new core facts (e.g., "User is preparing for an interview") and commits them to the vector collection.
+</details>
 
-```http
-POST http://ai-engine-host:8000/api/v1/chat
-Content-Type: application/json
+<details>
+<summary><b>🎬 Avatar Animation Trigger Codes</b></summary>
 
-{
-  "user_id": "usr_abc123",
-  "message": "I'm feeling anxious about my interview tomorrow",
-  "role": "therapist",
-  "session_id": "sess_xyz789"
-}
-```
-
-> **Important:** The `user_id` should be a stable, unique identifier from your auth system. The AI engine uses it to scope all memory per-user.
-
-### 3. AI Engine Response
-```json
-{
-  "text": "That's completely understandable — interviews can feel overwhelming...",
-  "emotion": "Anxious",
-  "animation_trigger": "BREATHE_CALM",
-  "audio_url": null,
-  "session_id": "sess_xyz789"
-}
-```
-
-### 4. Traditional Backend → Client
-Your backend can enrich the response (e.g., save to DB, generate TTS via ElevenLabs) before returning to the mobile app.
-
----
-
-## API Reference
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/v1/chat` | `POST` | Send a message, receive structured AI response |
-| `/health` | `GET` | Service health check + available roles |
-
-### `POST /api/v1/chat`
-
-**Request Body:**
-| Field | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `user_id` | `string` | ✅ | — | Unique user identifier |
-| `message` | `string` | ✅ | — | User's message (1-4000 chars) |
-| `role` | `string` | ❌ | `"friend"` | Personality role |
-| `session_id` | `string` | ❌ | auto-generated | Conversation thread ID |
-
-**Available Roles:** `mentor`, `friend`, `flirt`, `therapist`, `spiritual`, `partner`
-
-**Success Response (200):**
-| Field | Type | Description |
-|---|---|---|
-| `text` | `string` | The AI's reply |
-| `emotion` | `string` | Detected sentiment |
-| `animation_trigger` | `string` | 3D animation code |
-| `audio_url` | `string \| null` | TTS audio URL (future) |
-| `session_id` | `string` | Session identifier |
-
-**Moderation Block (451):**
-```json
-{
-  "detail": {
-    "blocked": true,
-    "reason": "Your message was flagged by our safety system...",
-    "flagged_categories": ["self-harm/intent"]
-  }
-}
-```
+The engine enforces structured returns mapping OpenAI outputs directly to 3D avatar animations:
+*   `NOD_COMPASSION` — Empathetic listening cues.
+*   `BREATHE_CALM` — Calming guidance patterns.
+*   `HEAD_TILT_CURIOUS` — Thinking/analyzing states.
+*   `FIST_BUMP` / `CELEBRATE` — Motivational highlights.
+</details>
 
 ---
 
-## Animation Trigger Codes
+## 🚀 Quick Start
 
-| Code | Use Case |
-|---|---|
-| `NOD_COMPASSION` | Empathetic acknowledgment |
-| `SMILE_WARM` | Happy, positive moments |
-| `LEAN_FORWARD` | Showing engagement |
-| `WAVE_HELLO` | Greetings |
-| `HEAD_TILT_CURIOUS` | Curious / thinking |
-| `LAUGH_GENTLE` | Light humor |
-| `HUG_VIRTUAL` | Comfort |
-| `CELEBRATE` | Excitement, wins |
-| `BREATHE_CALM` | Anxiety, calming |
-| `THINK_DEEP` | Philosophical moments |
-| `WINK_PLAYFUL` | Playful / flirty |
-| `HAND_HEART` | Tender, loving |
-| `TEAR_WIPE` | Sad, empathetic |
-| `FIST_BUMP` | Casual encouragement |
+### 1. Requirements
+*   Python 3.10+
+*   ChromaDB (will compile locally on first startup)
+*   Active OpenAI API key
 
----
+### 2. Configurations Setup
+Create a `.env` file in the project root:
+```env
+OPENAI_API_KEY=sk-proj-your-openai-api-key
+MODEL_NAME=gpt-4o
+DEBUG=False
+APP_TITLE="Humanic AI Companion Engine"
+APP_VERSION="1.2.0"
+```
 
-## Quick Start
-
+### 3. Installation & Run
+Build environment and install dependencies:
 ```bash
-# 1. Clone & enter project
-cd humanica
-
-# 2. Create virtual environment
 python -m venv .venv
-.venv\Scripts\activate       # Windows
-# source .venv/bin/activate  # macOS/Linux
+# On Windows
+.venv\Scripts\activate
+# On macOS/Linux
+source .venv/bin/activate
 
-# 3. Install dependencies
 pip install -r requirements.txt
+```
 
-# 4. Configure API key
-#    Edit .env and set your OPENAI_API_KEY
-
-# 5. Run the server
+Start the Uvicorn application server:
+```bash
 uvicorn app.main:app --reload --port 8000
+```
+Swagger UI will run at `http://localhost:8000/docs`.
 
-# 6. Open interactive docs
-#    http://localhost:8000/docs
-
-# 7. Run memory test (in another terminal)
+### 4. Running Memory Verification
+Execute the automated script to test ChromaDB fact extraction and context injection:
+```bash
 python tests/test_memory.py
 ```
 
 ---
 
-## Tech Stack
+## 📜 License
 
-| Layer | Technology |
-|---|---|
-| Framework | FastAPI |
-| AI Model | OpenAI GPT-4o |
-| Memory / RAG | ChromaDB (local vector store) |
-| Safety | OpenAI Moderation API |
-| Config | pydantic-settings + python-dotenv |
-
----
-
-## Future Integrations
-
-- **ElevenLabs TTS** → Populate `audio_url` in responses
-- **Streaming** → SSE/WebSocket support for real-time token delivery
-- **Conversation History** → Multi-turn context via session-scoped message buffers
-- **User Profiles** → Persistent preference storage beyond facts
+This project is licensed under the [MIT License](LICENSE).
